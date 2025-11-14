@@ -56,8 +56,18 @@ public class AuthService {
             throw new IllegalArgumentException("Refresh Token이 일치하지 않습니다.");
         }
 
-        // AccessToken 재발급
+
+
+        // AccessToken & RefreshToken 재발급
         String newAccessToken = jwtUtil.generateAccessToken(username, role.name());
-        return ReissueResponse.of(newAccessToken);
+        String newRefreshToken = jwtUtil.generateRefreshToken(username, role.name());
+
+        // DB에서 기존 RefreshToken 삭제 후 새로운 RefreshToken 저장 (RTR)
+        Instant expiresAt = jwtUtil.getExpiration(newRefreshToken);
+        refreshTokenRepository.deleteByUsername(username);
+        RefreshToken tokenToSave = new RefreshToken(username, newRefreshToken, expiresAt);
+        refreshTokenRepository.save(tokenToSave);
+
+        return ReissueResponse.of(newAccessToken, newRefreshToken);
     }
 }
