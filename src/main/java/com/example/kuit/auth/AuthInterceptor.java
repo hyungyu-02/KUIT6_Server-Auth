@@ -20,6 +20,7 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final JwtUtil jwtUtil;
 
     // 인증 로직을 인터셉터로 분리
+
     /**
      * 목적 : 컨트롤러마다 반복되는 인증 코드를 공통 관심사로 분리
      * 해야 할 일
@@ -48,7 +49,7 @@ public class AuthInterceptor implements HandlerInterceptor {
             String username = jwtUtil.getUsername(token);
             Role role = jwtUtil.getRole(token);
             request.setAttribute("username", username);
-            request.setAttribute("role",  role);
+            request.setAttribute("role", role);
 
             return true;
 
