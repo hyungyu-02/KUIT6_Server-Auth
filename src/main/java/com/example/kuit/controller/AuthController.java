@@ -3,11 +3,15 @@ import com.example.kuit.dto.request.LoginRequest;
 import com.example.kuit.dto.request.ReissueRequest;
 import com.example.kuit.dto.response.LoginResponse;
 import com.example.kuit.dto.response.ReissueResponse;
+import com.example.kuit.jwt.JwtUtil;
 import com.example.kuit.model.Role;
+import com.example.kuit.model.TokenType;
 import com.example.kuit.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequiredArgsConstructor
@@ -15,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final JwtUtil jwtUtil;
 
     // POST /api/auth/login  - 로그인 API
     /**
@@ -34,10 +39,24 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
 
-        // TODO: 로그인 성공시 RefreshToken 까지 발급해보기
+        // 로그인 성공시 RefreshToken 까지 발급됨
         LoginResponse response = authService.login(request.username(), request.password());
 
         return ResponseEntity.ok(response);
+        /**
+         이제 이 Response는
+
+         HTTP/1.1 200 OK
+         Content-Type: application/json
+
+         {
+             "accessToken": "ey... (짧은 엑세스 토큰)",
+             "refreshToken": "ey... (긴 리프레시 토큰)"
+         }
+
+         이런 내용을 담게 됨
+         이 응답 담는건 스프링 부트 프레임워크가 해줌
+        * */
     }
 
     // POST /api/auth/reissue  - 토큰 재발급 API
@@ -51,12 +70,22 @@ public class AuthController {
      */
     @PostMapping("/reissue")
     public ResponseEntity<ReissueResponse> reissue(@RequestBody ReissueRequest request) {
-        // TODO: 토큰 유효성 검사 - jwtUtil.validate 메서드 활용
+        String refreshToken = request.refreshToken();
 
-        // TODO: 토큰 타입 검사 - jwtUtil.getTokenType 메서드 활용
+        // 토큰 유효성 검사 - jwtUtil.validate 메서드 활용
+        if (!jwtUtil.validate(refreshToken)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token 입니다.");
+        }
 
-        // TODO: reissue API 완성 - Role.ROLE_USER 는 임시값이므로 토큰으로부터 추출해서 넘겨주어야합니다.
-        ReissueResponse response = authService.reissue("토큰에서 추출한 username 넘기기", Role.ROLE_USER, request.refreshToken());
+        // 토큰 타입 검사 - jwtUtil.getTokenType 메서드 활용
+        if (jwtUtil.getTokenType(refreshToken) != TokenType.REFRESH) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh Token 이 필요합니다.");
+        }
+
+        // reissue API 완성 - Role.ROLE_USER 는 임시값이므로 토큰으로부터 추출해서 넘겨주어야합니다.
+        String username = jwtUtil.getUsername(refreshToken);
+        Role role = jwtUtil.getRole(refreshToken);
+        ReissueResponse response = authService.reissue(username, role, refreshToken);
 
         return ResponseEntity.ok(response);
     }
