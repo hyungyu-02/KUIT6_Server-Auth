@@ -32,17 +32,9 @@ public class UserController {
      */
     @GetMapping("/me")
     public ResponseEntity<ProfileResponse> me(HttpServletRequest request) {
-        String token = extractBearer(request);
+        String username = request.getAttribute("username").toString();
 
-        if (!jwtUtil.validate(token)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다.");
-        }
-
-        if (jwtUtil.getTokenType(token) != TokenType.ACCESS) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Access Token 이 필요합니다.");
-        }
-
-        ProfileResponse profile = userService.getProfile(jwtUtil.getUsername(token));
+        ProfileResponse profile = userService.getProfile(username);
 
         return ResponseEntity.ok(profile);
     }
@@ -54,21 +46,7 @@ public class UserController {
      */
     @GetMapping("/admin")
     public ResponseEntity<AdminResponse> admin(HttpServletRequest request) {
-        // 토큰 추출 - extractBearer 메서드 활용
-        String token = extractBearer(request);
-
-        // 토큰 유효성 검사 - jwtUtil.validate 메서드 활용
-        if (!jwtUtil.validate(token)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다.");
-        }
-
-        // 토큰 타입 검사 - jwtUtil.getTokenType 메서드 활용
-        if (jwtUtil.getTokenType(token) != TokenType.ACCESS) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Access Token 이 필요합니다.");
-        }
-
-        // 토큰으로부터 유저 Role 추출 - jwtUtil.getRole 메서드 활용
-        Role roleOfUser = jwtUtil.getRole(token);
+        Role roleOfUser = (Role) request.getAttribute("role");
 
         // 관리자 권한 검사 - 토큰으로부터 추출한 Role 이 Role.ROLE_ADMIN 과 동일한지 검증
         if (roleOfUser == null || !roleOfUser.equals(Role.ROLE_ADMIN)) {
@@ -76,15 +54,5 @@ public class UserController {
         }
 
         return ResponseEntity.ok(AdminResponse.ok());
-    }
-
-    // 헤더로부터 토큰 추출
-    private String extractBearer(HttpServletRequest request) {
-        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-
-        if (!StringUtils.hasText(header) || !header.startsWith("Bearer ")) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authorization 헤더 전송 형식이 잘못되었습니다.");
-        }
-        return header.substring(7);
     }
 }

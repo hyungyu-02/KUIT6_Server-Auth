@@ -1,10 +1,16 @@
 package com.example.kuit.auth;
 
 import com.example.kuit.jwt.JwtUtil;
+import com.example.kuit.model.Role;
+import com.example.kuit.model.TokenType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 @Component
@@ -13,7 +19,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     private final JwtUtil jwtUtil;
 
-    // TODO: 인증 로직을 인터셉터로 분리해보자.
+    // 인증 로직을 인터셉터로 분리
     /**
      * 목적 : 컨트롤러마다 반복되는 인증 코드를 공통 관심사로 분리
      * 해야 할 일
@@ -26,6 +32,39 @@ public class AuthInterceptor implements HandlerInterceptor {
      */
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        return true;
+        try {
+            String token = extractBearer(request);
+
+            if (!jwtUtil.validate(token)) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
+                return false;
+            }
+
+            if (jwtUtil.getTokenType(token) != TokenType.ACCESS) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
+                return false;
+            }
+
+            String username = jwtUtil.getUsername(token);
+            Role role = jwtUtil.getRole(token);
+            request.setAttribute("username", username);
+            request.setAttribute("role",  role);
+
+            return true;
+
+        } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return false;
+        }
+
+    }
+
+    private String extractBearer(HttpServletRequest request) {
+        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+
+        if (!StringUtils.hasText(header) || !header.startsWith("Bearer ")) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authorization 헤더 전송 형식이 잘못되었습니다.");
+        }
+        return header.substring(7);
     }
 }
